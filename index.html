@@ -10,7 +10,7 @@
 
   <body>
     <!-- creation of the graphic camera return -->
-    <video id="videoElement" autoplay="true" ></video>
+    <video id="videoElement" width="640" height="480" autoplay="true" ></video>
     
   </body>
   <script>
@@ -76,7 +76,7 @@
 		// we check the right wrist position
 		// -- for the position : pose.keypoints[10].position
 		// if the hand is placed at the right side
-		if(pose.keypoints[10].position.x > 90)
+		if(pose.keypoints[10].position.x > 500)
 		{
 			// we send right on pgrabolosa MQTT FLUX
 			console.log("__RIGHT__");
@@ -86,7 +86,7 @@
 			
 		}
 		// if the hand is placed at the left side
-		else if((pose.keypoints[10].position.x < 10) && (pose.keypoints[10].position.x > 0))
+		else if((pose.keypoints[10].position.x < 150) && (pose.keypoints[10].position.x > 0))
 		{
 			// we send left on pgrabolosa MQTT FLUX
 			console.log("__LEFT__");
@@ -125,7 +125,7 @@
     }
     // event loop to launch processing each 2 seconds
     video.addEventListener('loadeddata', ()=>{
-      posenet.load().then(function(net) {
+      posenet.load({inputResolution: { width: 640, height: 480 }}).then(function(net) {
         gNet = net;
         setInterval(processImageLoop, 2000);
       })
