@@ -1,0 +1,43 @@
+<html>
+  <head>
+    <!-- Load TensorFlow.js -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+    <!-- Load Posenet -->
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+ </head>
+
+  <body>
+    <video id="video" width="640" height="480" autoplay></video>
+  </body>
+  <script>
+
+// ---- CAMERA SETUP PART
+var video = document.getElementById('video');
+
+// Get access to the camera!
+if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+    // Not adding `{ audio: true }` since we only want video now
+    navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
+        //video.src = window.URL.createObjectURL(stream);
+        video.srcObject = stream;
+        video.play();
+    });
+}
+
+// -------------------------------------------
+// --- POSE NET PART
+
+
+    // we create a Video element to work with the camera
+    var videoElement = document.getElementById('video');
+
+    // we load posenet with videoElement as
+posenet.load({
+    inputResolution: { width: 640, height: 480 }
+}).then(function(net){
+    net.estimateSinglePose(videoElement).then(function(framePose){
+        console.log(framePose);
+    });
+});
+  </script>
+</html>
