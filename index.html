@@ -1,43 +1,133 @@
 <html>
   <head>
-    <!-- Load TensorFlow.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
-    <!-- Load Posenet -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/posenet"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.js" type="text/javascript"></script>
  </head>
 
   <body>
-    <video id="video" width="640" height="480" autoplay></video>
+    <!-- creation of the graphic camera return -->
+    <video id="videoElement" autoplay="true" ></video>
+    
   </body>
   <script>
+    // to publish on MQTT flux
+    client = new Paho.MQTT.Client("grabolosa.fr", 9001, 	"clientId");
+    client.onConnectionLost = onConnectionLost;
+    client.connect({onSuccess:onConnect});
 
-// ---- CAMERA SETUP PART
-var video = document.getElementById('video');
+    var flipHorizontal = false;
 
-// Get access to the camera!
-if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-    // Not adding `{ audio: true }` since we only want video now
-    navigator.mediaDevices.getUserMedia({ video: true }).then(function(stream) {
-        //video.src = window.URL.createObjectURL(stream);
-        video.srcObject = stream;
-        video.play();
-    });
-}
+    // video section
+    var video = document.querySelector("#videoElement");
 
-// -------------------------------------------
-// --- POSE NET PART
+    // we start the camera if error occured we display error
+    if (navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ video: true })
+        .then(function (stream) {
+          video.srcObject = stream;
+        })
+        .catch(function (err0r) {
+	  // error displayed on console
+          console.log("Something went wrong!");
+        });
+    }
+    
+    var gNet;
 
+    // function used on connection on MQTT server
+    function onConnect() 
+    {
+	console.log("__CONNECT__");
+	message = new Paho.MQTT.Message("capture/debug");
+  	message.destinationName = "__CONNECT__";
+  	client.send(message);
+    }
 
-    // we create a Video element to work with the camera
-    var videoElement = document.getElementById('video');
+    // function used in case on lost connection from MQTT server
+    function onConnectionLost(responseObject) 
+    {
+    	if (responseObject.errorCode !== 0) 
+		{
+			console.log("onConnectionLost:"+responseObject.errorMessage);
+  		}
+	}
 
-    // we load posenet with videoElement as
-posenet.load({
-    inputResolution: { width: 640, height: 480 }
-}).then(function(net){
-    net.estimateSinglePose(videoElement).then(function(framePose){
-        console.log(framePose);
-    });
-});
+    // camera data analisys
+    function processImage() {
+      const pose = gNet.estimateSinglePose(video, {
+        flipHorizontal: true
+      });
+      return pose;
+    }
+    
+    function processImageLoop() 
+	{
+      		// when it's time to "take pic"
+      		processImage().then((pose) => {
+		// we check if the score is better than the needed grade
+		if(pose.score > 0.3)
+		{
+		// if we success at this condition
+        	console.log(pose.keypoints[10].position);
+		// we check the right wrist position
+		// -- for the position : pose.keypoints[10].position
+		// if the hand is placed at the right side
+		if(pose.keypoints[10].position.x > 90)
+		{
+			// we send right on pgrabolosa MQTT FLUX
+			console.log("__RIGHT__");
+			message = new Paho.MQTT.Message("capture/hand");
+  			message.destinationName = "RIGHT";
+  			client.send(message);
+			
+		}
+		// if the hand is placed at the left side
+		else if((pose.keypoints[10].position.x < 10) && (pose.keypoints[10].position.x > 0))
+		{
+			// we send left on pgrabolosa MQTT FLUX
+			console.log("__LEFT__");
+			message = new Paho.MQTT.Message("capture/hand");
+  			message.destinationName = "LEFT";
+  			client.send(message);
+			
+		}
+		// if the hand is placed at the top
+		else if((pose.keypoints[10].position.x > 10 )&& (pose.keypoints[10].position.x < 90 )&& (pose.keypoints[10].position.y > 90 ))
+		{
+			// we send top on pgrabolosa MQTT FLUX
+			console.log("__TOP__");
+			message = new Paho.MQTT.Message("capture/hand");
+  			message.destinationName = "TOP";
+  			client.send(message);
+			
+		}
+		// in others cases we dont do anything
+	
+		//////////////////////////////////////////////////////////
+		///// FLUX ONLY FOR TEST DONT IMPLEMENT THIS SECTION /////
+		//////////////////////////////////////////////////////////
+	
+		else
+		{
+			console.log("__DEBUG__");
+			message = new Paho.MQTT.Message("capture/debug");
+  			message.destinationName = "__DEBUG__";
+  			client.send(message);
+		}
+	}
+	// if the score is too bad we dont do anything
+
+      })
+    }
+    // event loop to launch processing each 2 seconds
+    video.addEventListener('loadeddata', ()=>{
+      posenet.load().then(function(net) {
+        gNet = net;
+        setInterval(processImageLoop, 2000);
+      })
+    })
+
+    
   </script>
 </html>
